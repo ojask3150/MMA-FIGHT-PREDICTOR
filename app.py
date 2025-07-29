@@ -6,7 +6,7 @@ import plotly.graph_objects as go
 app = Flask(__name__)
 
 
-model = joblib.load('ufc_predictor_model.joblib')
+model = joblib.load('predictor_model.joblib')
 scaler = joblib.load('scaler.joblib')
 
 @app.route('/')

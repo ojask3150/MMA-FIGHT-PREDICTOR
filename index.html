@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>MMA Fight Predictor</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        form { margin-bottom: 20px; }
+        label { display: block; margin-top: 10px; }
+        input[type="number"], input[type="radio"] { margin-bottom: 10px; }
+        #dual-gauge { margin: 20px 0; border: 1px solid #ddd; border-radius: 5px; }
+        .prediction-result { 
+            padding: 15px; 
+            background: #f8f9fa;
+            border-radius: 5px;
+            margin: 20px 0;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>MMA Fight Predictor</h1>
+    <form id="prediction-form" method="post" action="/predict">
+         <div class="form-container">
+            <div class="form-columns">               
+                <div class="form-column blue-card">
+                    <h3 class="card-title">Blue Corner</h3>
+                    <label for="bluewinpct100">Fighter 1(Blue Corner) Win % of total fights:</label>
+                    <input type="number" step="0.01" name="bluewinpct100" placeholder="e.g., 75" required><br>
+                    <label for="BlueCurrentWinStreak">Blue Fighter Current Win Streak:</label>
+                    <input type="number" name="BlueCurrentWinStreak" min="0" placeholder="e.g., 3" required><br>
+
+                    <label for="Heightblue">Blue fighter Height in CMS:</label>
+                    <input type="number" step="0.01" name="Heightblue" placeholder="e.g., 170.70" required><br>
+                    
+                    <label for="Reachblue">Blue fighter Reach in CMS:</label>
+                    <input type="number" step="0.01" name="Reachblue" placeholder="e.g., 180.0" required><br>
+
+                    <label for="avgsubattblue">Blue Fighter's Average Submission Attempts per Fight:</label>
+                    <input type="number" step="0.01" name="avgsubattblue" placeholder="e.g., 2.5" required><br>
+                </div>
+
+                <div class="form-column red-card">
+                    <h3 class="card-title">Red Corner</h3>
+                    <label for="redwinpct100">Fighter 2(Red Corner) Win % of total fights:</label>
+                    <input type="number" step="0.01" name="redwinpct100" placeholder="e.g., 75" required><br>
+
+                    <label for="RedCurrentWinStreak">Red Fighter Current Win Streak:</label>
+                    <input type="number" name="RedCurrentWinStreak" min="0" placeholder="e.g., 2" required><br>
+                    <label for="Heightred">Red fighter Height in CMS:</label>
+                    <input type="number" step="0.01" name="Heightred" placeholder="e.g., 165.75" required><br>
+                    
+                    <label for="Reachred">Red fighter Reach in CMS:</label>
+                    <input type="number" step="0.01" name="Reachred" placeholder="e.g., 180.98" required><br>
+
+                    <label for="avgsubattred">Red Fighter's Average Submission Attempts per Fight:</label>
+                    <input type="number" step="0.01" name="avgsubattred" placeholder="e.g., 2.5" required><br>
+                </div>
+        </div>
+
+        <div class="form-fullwidth">
+            <label>Which fighter is better ranked?</label><br>
+            <input type="radio" id="redranked" name="ranked" value="red">
+            <label for="redranked">Red Fighter</label><br>
+            
+            <input type="radio" id="blueranked" name="ranked" value="blue">
+            <label for="blueranked">Blue Fighter</label><br>
+            
+            <input type="radio" id="no_rank" name="ranked" value="none" checked>
+            <label for="no_rank">Neither/Equal Ranking</label><br>
+
+            <label for="RGrapplerBStriker">Is Red a Grappler vs Blue Striker? (1 for Yes, 0 for No):</label>
+            <input type="number" name="RGrapplerBStriker" min="0" max="1" placeholder="0 or 1" required><br>
+            
+            <label for="BGrapplerRStriker">Is Blue a Grappler vs Red Striker? (1 for Yes, 0 for No):</label>
+            <input type="number" name="BGrapplerRStriker" min="0" max="1" placeholder="0 or 1" required><br>
+
+            <label for="strike_diff100">Significant Strike % Difference (Blue-Red) :</label>
+            <input type="number" step="0.01" name="strike_diff100" placeholder="e.g., 23" required><br>
+
+            <label for="td_acc_diff100">Takedown Accuracy % Difference (Blue-Red):</label>
+            <input type="number" step="0.01" name="td_acc_diff100" placeholder="e.g., 34" required><br>
+        </div>
+
+        <button type="submit">Predict</button>
+    </form>
+
+    <div id="prediction-result" class="prediction-result">
+        {% if prediction_text %}
+            {{ prediction_text }}
+        {% endif %}
+    </div>
+    
+    <div id="dual-gauge" style="width:100%; height:400px;"></div>
+
+    <script>
+        document.getElementById('prediction-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            try {
+             
+                const button = e.target.querySelector('button');
+                button.textContent = "Predicting...";
+                button.disabled = true;
+                
+       
+                const formData = new FormData(e.target);
+                
+       
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    throw new Error(await response.text());
+                }
+                
+                const result = await response.json();
+ 
+                if (document.getElementById('dual-gauge').data) {
+                    Plotly.react('dual-gauge', result.figure.data, result.figure.layout);
+                } else {
+                    Plotly.newPlot('dual-gauge', result.figure.data, result.figure.layout);
+                }
+                
+
+                const winnerText = result.winner ? `Predicted Winner: ${result.winner}` : "";
+                document.getElementById('prediction-result').innerHTML = `
+                    ${result.prediction_text}<br>
+                    <strong>${winnerText}</strong>
+                `;
+                
+            } catch (error) {
+                console.error("Error:", error);
+                document.getElementById('prediction-result').innerHTML = `
+                    <span style="color: red;">Error: ${error.message}</span>
+                `;
+            } finally {
+         
+                const button = e.target.querySelector('button');
+                button.textContent = "Predict";
+                button.disabled = false;
+            }
+        });
+
+
+        Plotly.newPlot('dual-gauge', [], {
+            title: {
+                text: "Enter fight details to see prediction",
+                font: { size: 16 }
+            },
+            paper_bgcolor: "rgba(0,0,0,0)",
+            plot_bgcolor: "rgba(0,0,0,0)"
+        });
+    </script>
+</body>
+</html>
